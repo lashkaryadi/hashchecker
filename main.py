@@ -1,17 +1,20 @@
 from flask import Flask, render_template, request
-import google.generativeai as genai
 import os
+import google.generativeai as genai
 import PyPDF2
-
+from dotenv import load_dotenv
+load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
 # Set up the Google API Key
-os.environ["GOOGLE_API_KEY"] = "you api key here"
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+api_key = os.environ.get("GOOGLE_API_KEY")
+if not api_key:
+    raise ValueError("GOOGLE_API_KEY is not set. Please configure it in your .env file or environment variables.")
+genai.configure(api_key=api_key)
 
 # Initialize the Gemini model
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-3.5-flash")
 
 # functions
 def predict_fake_or_real_email_content(text):
@@ -106,4 +109,4 @@ def predict_url():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=8080)
