@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request
 import os
+import time
 from google import genai
+from google.genai import errors as genai_errors
 import PyPDF2
 from dotenv import load_dotenv
 load_dotenv()
@@ -33,11 +35,26 @@ def predict_fake_or_real_email_content(text):
     Note: Don't return empty or null, you only need to return message for the input text
     """
 
-    response = client.models.generate_content(
-        model="gemini-3.5-flash",
-        contents=prompt,
-    )
-    return response.text.strip() if response else "Classification failed."
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.5-flash",
+                contents=prompt,
+            )
+            return response.text.strip() if response else "Classification failed."
+        except genai_errors.ServerError as e:
+            if e.status_code == 503 and attempt < 2:
+                time.sleep(2 ** attempt)  # 1s, then 2s back-off
+                continue
+            return (
+                "⚠️ The AI service is currently experiencing high demand. "
+                "Please try again in a few seconds."
+            )
+        except genai_errors.ClientError as e:
+            return f"⚠️ Request error: {e.message}. Please check your input and try again."
+        except Exception:
+            return "⚠️ An unexpected error occurred while analysing the content. Please try again."
+    return "⚠️ The AI service did not respond after multiple retries. Please try again later."
 
 
 def url_detection(url):
@@ -65,11 +82,23 @@ def url_detection(url):
     Note: Don't return empty or null, at any cost return the corrected class
     """
 
-    response = client.models.generate_content(
-        model="gemini-3.5-flash",
-        contents=prompt,
-    )
-    return response.text if response else "Detection failed."
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.5-flash",
+                contents=prompt,
+            )
+            return response.text.strip() if response else "Detection failed."
+        except genai_errors.ServerError as e:
+            if e.status_code == 503 and attempt < 2:
+                time.sleep(2 ** attempt)
+                continue
+            return "unavailable"
+        except genai_errors.ClientError:
+            return "error"
+        except Exception:
+            return "error"
+    return "unavailable"
 
 
 # Routes
