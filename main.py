@@ -57,29 +57,40 @@ def predict_fake_or_real_email_content(text):
     return "⚠️ The AI service did not respond after multiple retries. Please try again later."
 
 
+KNOWN_CLASSES = ["benign", "phishing", "malware", "defacement"]
+
+
+def normalize_url_class(raw: str) -> str:
+    """Extract the first known class word from Gemini's raw response."""
+    text = raw.lower().strip()
+    for cls in KNOWN_CLASSES:
+        if cls in text:
+            return cls
+    return "unknown"
+
+
 def url_detection(url):
     prompt = f"""
-    You are an advanced AI model specializing in URL security classification. Analyze the given URL and classify it as one of the following categories:
+    You are an advanced AI model specializing in URL security classification.
+    Analyze the given URL and classify it as EXACTLY ONE of these four categories:
 
-    1. Benign**: Safe, trusted, and non-malicious websites such as google.com, wikipedia.org, amazon.com.
-    2. Phishing**: Fraudulent websites designed to steal personal information. Indicators include misspelled domains (e.g., paypa1.com instead of paypal.com), unusual subdomains, and misleading content.
-    3. Malware**: URLs that distribute viruses, ransomware, or malicious software. Often includes automatic downloads or redirects to infected pages.
-    4. Defacement**: Hacked or defaced websites that display unauthorized content, usually altered by attackers.
+    - benign     : Safe, trusted websites (google.com, wikipedia.org, amazon.com)
+    - phishing   : Sites designed to steal credentials — misspelled domains,
+                   fake login pages, misleading subdomains (e.g. paypa1.com)
+    - malware    : URLs that distribute viruses, ransomware, or trigger automatic
+                   downloads of malicious software
+    - defacement : Hacked/altered websites displaying unauthorized content
 
-    **Example URLs and Classifications:**
-    - **Benign**: "https://www.microsoft.com/"
-    - **Phishing**: "http://secure-login.paypa1.com/"
-    - **Malware**: "http://free-download-software.xyz/"
-    - **Defacement**: "http://hacked-website.com/"
+    Examples:
+    https://www.microsoft.com/          -> benign
+    http://secure-login.paypa1.com/     -> phishing
+    http://free-download-software.xyz/  -> malware
+    http://hacked-website.com/          -> defacement
 
-    **Input URL:** {url}
+    URL to classify: {url}
 
-    **Output Format:**  
-    - Return only a string class name
-    - Example output for a phishing site:  
-
-    Analyze the URL and return the correct classification (Only name in lowercase such as benign etc.
-    Note: Don't return empty or null, at any cost return the corrected class
+    IMPORTANT: Reply with ONLY the single lowercase class name and nothing else.
+    Valid replies: benign | phishing | malware | defacement
     """
 
     for attempt in range(3):
@@ -88,17 +99,18 @@ def url_detection(url):
                 model="gemini-3.5-flash",
                 contents=prompt,
             )
-            return response.text.strip() if response else "Detection failed."
+            raw = response.text.strip() if response else ""
+            return normalize_url_class(raw)
         except genai_errors.ServerError as e:
             if e.status_code == 503 and attempt < 2:
                 time.sleep(2 ** attempt)
                 continue
-            return "unavailable"
+            return None  # signals a server error
         except genai_errors.ClientError:
-            return "error"
+            return None
         except Exception:
-            return "error"
-    return "unavailable"
+            return None
+    return None
 
 
 # Routes
@@ -136,9 +148,17 @@ def predict_url():
     url = request.form.get('url', '').strip()
 
     if not url.startswith(("http://", "https://")):
-        return render_template("index.html", message="Invalid URL format.", input_url=url)
+        return render_template("index.html",
+                               message="⚠️ Invalid URL. Please include http:// or https://",
+                               input_url=url)
 
     classification = url_detection(url)
+
+    if classification is None:
+        return render_template("index.html",
+                               message="⚠️ The AI service is temporarily unavailable. Please try again in a few seconds.",
+                               input_url=url)
+
     return render_template("index.html", input_url=url, predicted_class=classification)
 
 

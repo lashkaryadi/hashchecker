@@ -112,11 +112,11 @@
             font-size: 18px;
         }
 
-        .benign { color: #34D399; }
-        .defacement { color: #F59E0B; }
-        .malware { color: #EF4444; }
-        .phishing { color: #8B5CF6; }
-        .unknown { color: #ffffff; }
+        .benign     { color: #34D399; border: 1px solid #34D399; background: rgba(52,211,153,0.08); }
+        .defacement { color: #F59E0B; border: 1px solid #F59E0B; background: rgba(245,158,11,0.08); }
+        .malware    { color: #EF4444; border: 1px solid #EF4444; background: rgba(239,68,68,0.08); }
+        .phishing   { color: #8B5CF6; border: 1px solid #8B5CF6; background: rgba(139,92,246,0.08); }
+        .unknown    { color: #ffffff; border: 1px solid #555; background: rgba(255,255,255,0.05); }
     </style>
 
     <script>
@@ -157,9 +157,13 @@
         </form>
 
         {% if predicted_class %}
+            {% set icons = {'benign': '✅', 'phishing': '🎣', 'malware': '☠️', 'defacement': '🔓', 'unknown': '❓'} %}
             <div class="result-box {{ predicted_class.lower() }}">
                 <p><strong>URL:</strong> {{ input_url }}</p>
-                <p><strong>Predicted Class:</strong> {{ predicted_class }}</p>
+                <p><strong>Classification:</strong>
+                    {{ icons.get(predicted_class.lower(), '❓') }}
+                    <strong>{{ predicted_class | upper }}</strong>
+                </p>
             </div>
         {% endif %}
     </div>
