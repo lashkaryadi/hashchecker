@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request
 import os
-import google.generativeai as genai
+from google import genai
 import PyPDF2
 from dotenv import load_dotenv
 load_dotenv()
@@ -11,10 +11,9 @@ app = Flask(__name__)
 api_key = os.environ.get("GOOGLE_API_KEY")
 if not api_key:
     raise ValueError("GOOGLE_API_KEY is not set. Please configure it in your .env file or environment variables.")
-genai.configure(api_key=api_key)
 
-# Initialize the Gemini model
-model = genai.GenerativeModel("gemini-3.5-flash")
+# Initialize the Gemini Client
+client = genai.Client(api_key=api_key)
 
 # functions
 def predict_fake_or_real_email_content(text):
@@ -34,7 +33,10 @@ def predict_fake_or_real_email_content(text):
     Note: Don't return empty or null, you only need to return message for the input text
     """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model="gemini-3.5-flash",
+        contents=prompt,
+    )
     return response.text.strip() if response else "Classification failed."
 
 
@@ -63,7 +65,10 @@ def url_detection(url):
     Note: Don't return empty or null, at any cost return the corrected class
     """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model="gemini-3.5-flash",
+        contents=prompt,
+    )
     return response.text if response else "Detection failed."
 
 
@@ -108,5 +113,9 @@ def predict_url():
     return render_template("index.html", input_url=url, predicted_class=classification)
 
 
+
 if __name__ == '__main__':
-    app.run(debug=True, port=8080)
+
+    port = int(os.getenv("PORT", 8080))
+
+    app.run(host='0.0.0.0', port=port, debug=False)
